@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import (
     CheckConstraint,
     DateTime,
+    Index,
     Enum,
     ForeignKey,
     Integer,
@@ -22,6 +23,7 @@ class Operation(Base):
             "source_location_id <> dest_location_id",
             name="source_dest_different",
         ),
+        Index("ix_operations_type_status", "type", "status"),  # dashboard + list filters
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

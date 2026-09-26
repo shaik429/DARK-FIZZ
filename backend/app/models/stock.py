@@ -1,7 +1,7 @@
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, Numeric
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
 
@@ -27,6 +27,7 @@ class StockMove(Base):
     __tablename__ = "stock_moves"
     __table_args__ = (
         CheckConstraint("quantity > 0", name="quantity_positive"),
+        Index("ix_stock_moves_product_id_done_at", "product_id", "done_at"),  # move history
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

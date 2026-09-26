@@ -81,6 +81,14 @@ UNIQUE_CONSTRAINTS = {
 # Same errors if a column was declared with unique=True, index=True
 UNIQUE_CONSTRAINTS["ix_users_email"] = UNIQUE_CONSTRAINTS["uq_users_email"]
 UNIQUE_CONSTRAINTS["ix_products_sku"] = UNIQUE_CONSTRAINTS["uq_products_sku"]
+# Composite UNIQUE constraints are named with all their columns in the models
+UNIQUE_CONSTRAINTS["uq_locations_warehouse_id_name"] = UNIQUE_CONSTRAINTS["uq_locations_warehouse_id"]
+UNIQUE_CONSTRAINTS["uq_reorder_rules_product_id_warehouse_id"] = UNIQUE_CONSTRAINTS[
+    "uq_reorder_rules_product_id"
+]
+UNIQUE_CONSTRAINTS["uq_operation_lines_operation_id_product_id"] = UNIQUE_CONSTRAINTS[
+    "uq_operation_lines_operation_id"
+]
 
 # CHECK constraints are matched by table, so the exact name after the table
 # doesn't matter (ck_stock_quants_anything -> INSUFFICIENT_STOCK).

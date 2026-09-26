@@ -10,7 +10,7 @@ Every unit on hand is backed by a row in an append-only stock ledger.
 |---|---|---|
 | Dheekshith | Frontend | React screens, client-side validation, API calls |
 | Rauf | Backend | Database schema, migrations, REST API, auth, operations engine |
-| Rohit | Error handling, testing, docs | Global error handling, tests, README, repo hygiene |
+| Rohit | Error handling, testing, docs | Global error handling, tests, README, Docker setup, repo hygiene |
 
 ---
 
@@ -118,13 +118,24 @@ and a banner when the server or database is unreachable.
 
 ## Run it locally
 
-### 1. Database + mail (Docker)
+> **Run the backend and the frontend on the same machine.** The frontend calls
+> `http://localhost:8000`, which means "this computer". If the backend runs on a
+> different laptop, the app shows *"The server is not reachable"*.
+
+### Prerequisites
+
+- Python 3.11+, Node.js 20+, Git
+- MySQL 8.0.16+ (installed locally **or** via Docker) — CHECK constraints need 8.0.16+
+
+### 1. Database
+
+**Option A — Docker** (MySQL 8.4 + Mailpit for OTP emails):
 
 ```bash
-docker compose up -d          # MySQL 8.4 on 3306, Mailpit on 8025
+docker compose up -d
 ```
 
-Already have MySQL 8.0.16+ installed? Skip Docker for the database and run once:
+**Option B — MySQL already installed.** Run once as root:
 
 ```sql
 CREATE DATABASE stocksense CHARACTER SET utf8mb4;
@@ -132,7 +143,9 @@ CREATE USER 'stocksense'@'localhost' IDENTIFIED BY 'stocksense';
 GRANT ALL PRIVILEGES ON stocksense.* TO 'stocksense'@'localhost';
 ```
 
-### 2. Backend
+With Option B you can still run only the mail catcher: `docker compose up -d mailpit`.
+
+### 2. Backend (terminal 1)
 
 ```bash
 cd backend
@@ -140,14 +153,18 @@ python -m venv venv
 source venv/bin/activate            # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 cp .env.example .env                # Windows: copy .env.example .env
-alembic upgrade head                # creates all tables
+alembic upgrade head                # creates all 13 tables
 python -m app.seed                  # demo warehouses, locations, products, users
 uvicorn app.main:app --reload
 ```
 
-API: http://localhost:8000 · Interactive docs: **http://localhost:8000/docs**
+`alembic upgrade head` must print `Running upgrade -> 0001_initial, initial schema`.
 
-### 3. Frontend
+- API: http://localhost:8000 (the root `/` returns a `NOT_FOUND` JSON error — that's expected)
+- Health check: http://localhost:8000/health → `{"status":"ok"}`
+- **Interactive API docs: http://localhost:8000/docs**
+
+### 3. Frontend (terminal 2)
 
 ```bash
 cd frontend
@@ -156,7 +173,7 @@ cp .env.example .env                # Windows: copy .env.example .env
 npm run dev
 ```
 
-App: http://localhost:5173
+App: **http://localhost:5173**
 
 ### Demo logins
 
@@ -165,8 +182,17 @@ App: http://localhost:5173
 | Manager | manager@stocksense.com | Manager@123 |
 | Staff | staff@stocksense.com | Staff@123 |
 
-OTP emails appear in Mailpit at http://localhost:8025. (If Mailpit isn't running, the
-backend logs the code to its console — dev only.)
+New sign-ups are always **staff**. OTP emails appear in Mailpit at http://localhost:8025.
+If Mailpit isn't running, the backend prints the code in its terminal (dev only).
+
+### Reset to a clean demo
+
+```sql
+DROP DATABASE stocksense;
+CREATE DATABASE stocksense CHARACTER SET utf8mb4;
+```
+
+then `alembic upgrade head` and `python -m app.seed` again.
 
 ### Environment variables (`backend/.env`)
 
@@ -179,6 +205,57 @@ backend logs the code to its console — dev only.)
 | `ALGORITHM` | HS256 | JWT algorithm |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | 60 | login lifetime |
 | `SMTP_HOST` / `SMTP_PORT` | localhost / 1025 | Mailpit |
+
+Frontend: `frontend/.env` → `VITE_API_URL=http://localhost:8000`
+
+---
+
+## Demo walkthrough (the problem statement's steel example)
+
+1. Log in as the manager → **Dashboard**
+2. **Operations → New → Receipt:** Steel, 100 kg into `WH/Stock` → Create draft → **Validate** (stock +100)
+3. **New → Internal transfer:** Steel 100, `WH/Stock` → `WH/Production Rack` → Validate (total unchanged)
+4. **New → Delivery:** Steel 20 from `WH/Production Rack` → Validate (stock −20)
+5. **New → Adjustment:** `WH/Production Rack`, counted **77** → Validate (logs −3)
+6. **Operations → Move history:** 4 ledger rows · **Products → Steel:** 77 kg at Production Rack
+7. **Dashboard:** Steel is low stock (77 ≤ min 80) → reorder suggestion **123**
+
+Try the errors: deliver more than on hand, create SKU `STL-001` again, wrong password,
+or log in as staff and try a manager action.
+
+## API reference
+
+Full, clickable docs at **/docs**. All routes except `/auth/*` and `/health` need
+`Authorization: Bearer <token>`. 🔒 = manager only.
+
+| Method | Path | Purpose |
+|---|---|---|
+| POST | `/auth/signup` · `/auth/login` | create account · get JWT |
+| POST | `/auth/forgot-password` · `/auth/reset-password` | OTP reset |
+| GET | `/auth/me` | current user |
+| GET | `/dashboard/kpis` · `/dashboard/low-stock` | KPIs (filters: `warehouse_id`, `category_id`) · alerts + reorder qty |
+| GET / POST 🔒 | `/products` | list (`q`, `category_id`) / create (optional initial stock) |
+| GET / PUT 🔒 | `/products/{id}` | read / update |
+| GET | `/products/{id}/stock` | stock per location |
+| GET / POST 🔒 | `/categories`, `/warehouses`, `/locations` | master data |
+| GET | `/uoms`, `/partners` | units, suppliers / customers |
+| GET / PUT 🔒 | `/reorder-rules` | reordering rules (min / max) |
+| GET / POST | `/operations` | list (`type`, `status`, `warehouse_id`) / create draft |
+| GET | `/operations/{id}` | detail with lines and availability |
+| POST | `/operations/{id}/confirm` · `/validate` · `/cancel` | status changes; `validate` moves stock |
+| GET | `/moves` | stock ledger (move history), paged with `limit` / `offset` |
+| GET | `/health` | database connectivity check |
+
+## Troubleshooting
+
+| You see | Cause | Fix |
+|---|---|---|
+| Orange banner *"server is not reachable"* | backend not running on **this** machine | start `uvicorn` in `backend/` on the same computer |
+| `npm error ENOENT ... package.json` | `npm` run from the repo root | `cd frontend` first |
+| `alembic upgrade head` prints no "Running upgrade" line | database already at the latest version, or migration missing | check `backend/alembic/versions/0001_initial_schema.py` exists; reset the database |
+| `{"error":"NOT_FOUND"}` at http://localhost:8000 | there is no page at `/` | open `/docs` or `/health` |
+| `port is already allocated` (Docker) | local MySQL already uses 3306 | stop it, or map `"3307:3306"` and set `DB_PORT=3307` |
+| CHECK constraints not enforced | MySQL older than 8.0.16 | use the Docker MySQL 8.4 |
 
 ## Tests
 

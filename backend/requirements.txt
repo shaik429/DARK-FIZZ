@@ -27,3 +27,6 @@ pydantic-settings
 passlib[bcrypt]
 python-jose[cryptography]
 python-multipart
+pydantic-settings
+pymysql
+cryptography

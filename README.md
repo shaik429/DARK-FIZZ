@@ -182,8 +182,23 @@ App: **http://localhost:5173**
 | Manager | manager@stocksense.com | Manager@123 |
 | Staff | staff@stocksense.com | Staff@123 |
 
-New sign-ups are always **staff**. OTP emails appear in Mailpit at http://localhost:8025.
-If Mailpit isn't running, the backend prints the code in its terminal (dev only).
+New sign-ups are always **staff**.
+
+### OTP password reset — where the code goes
+
+The 6-digit code is stored **hashed**, expires in **10 minutes** and allows **5 attempts**.
+Delivery depends on `backend/.env`, checked in this order:
+
+| Setup | Where the code appears |
+|---|---|
+| Default (`SMTP_HOST=localhost`, Mailpit running) | Mailpit inbox at http://localhost:8025 |
+| Real email (`SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=587`, `SMTP_USER`, `SMTP_PASSWORD` = Gmail App Password) | the user's real inbox |
+| Neither reachable | the backend terminal: `DEV ONLY OTP for <email> is <code>` |
+
+Email failure never breaks the reset — the code is always logged as a fallback.
+**Known limitation:** real-inbox delivery did not work on the hackathon network in time,
+so the demo video reads the code from the backend log.
+The terminal fallback is for local development only and would be removed in production.
 
 ### Reset to a clean demo
 
@@ -256,6 +271,8 @@ Full, clickable docs at **/docs**. All routes except `/auth/*` and `/health` nee
 | `{"error":"NOT_FOUND"}` at http://localhost:8000 | there is no page at `/` | open `/docs` or `/health` |
 | `port is already allocated` (Docker) | local MySQL already uses 3306 | stop it, or map `"3307:3306"` and set `DB_PORT=3307` |
 | CHECK constraints not enforced | MySQL older than 8.0.16 | use the Docker MySQL 8.4 |
+| OTP never reaches the inbox | Mailpit not running, or network blocks SMTP port 587 | read the code from the backend terminal (`DEV ONLY OTP ...`), or `docker compose up -d mailpit` |
+| `SMTPAuthenticationError` in the log | normal Gmail password used | create a Gmail **App Password** (needs 2-Step Verification) |
 
 ## Tests
 

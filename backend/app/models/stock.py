@@ -45,3 +45,4 @@ class StockMove(Base):
     quantity: Mapped[float] = mapped_column(Numeric(12, 3), nullable=False)
     done_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     done_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+

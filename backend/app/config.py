@@ -16,6 +16,10 @@ class Settings(BaseSettings):
 
     SMTP_HOST: str = "localhost"
     SMTP_PORT: int = 1025
+    # Leave SMTP_USER empty for Mailpit. For real Gmail: smtp.gmail.com, 587, your Gmail, a 16-char App Password.
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "no-reply@stocksense.com"
 
 
 settings = Settings()
